@@ -247,10 +247,8 @@ func TestStatusNeedsAttention(t *testing.T) {
 	if !strings.Contains(o, "hasn't reported yet") || !strings.Contains(o, "90 s") || !strings.Contains(o, "2 in the last 24 h") {
 		t.Errorf("stdout = %s", o)
 	}
-	var printed strings.Builder
-	report(err)
-	if printed.Len() != 0 {
-		t.Error("the error mustn't be printed twice")
+	if !errors.Is(err, errReported) {
+		t.Error("report would print the problem a second time")
 	}
 }
 

@@ -28,6 +28,7 @@ type fakeDocker struct {
 	opens      []containers.Start
 	changed    chan struct{}
 	silentStop bool // a damaged stream stays open and silent, rather than ending
+	jumpOver   bool // a damaged stream carries on with new lines, as Docker really does
 }
 
 type logLine struct {
@@ -142,6 +143,12 @@ func (f *fakeDocker) feed(ctx context.Context, w *io.PipeWriter, id string, star
 	for {
 		f.mu.Lock()
 		damage, damaged := f.damagedAt[id]
+		if damaged && !start.FromEnd && next >= damage && f.jumpOver {
+			next = len(f.logs[id])
+			delete(f.damagedAt, id)
+			f.mu.Unlock()
+			continue
+		}
 		if damaged && !start.FromEnd && next >= damage {
 			silent := f.silentStop
 			f.mu.Unlock()
@@ -805,5 +812,66 @@ func TestLongBusySpellIsNeverCalledDamage(t *testing.T) {
 		if start.FromEnd {
 			t.Fatal("a busy proxy must not count as a damaged log")
 		}
+	}
+}
+
+func TestSkippedBacklogIsRecorded(t *testing.T) {
+	d, s := newFakeDocker(), newFakeStore()
+	d.jumpOver = true
+	d.add(running("web"))
+	d.write("web", t0.Add(time.Second), "before the damage")
+	stop := run(t, d, s)
+	waitFor(t, s, "before the damage")
+	stop()
+
+	d.mu.Lock()
+	d.damagedAt["web"] = 1
+	d.mu.Unlock()
+	d.write("web", t0.Add(2*time.Second), "skipped by Docker")
+	run(t, d, s)
+	eventually(t, "the stream to open", func() bool { return len(d.starts()) >= 2 })
+	time.Sleep(20 * time.Millisecond)
+	d.write("web", t0.Add(3*time.Second), "new line")
+
+	waitFor(t, s, "before the damage", "new line")
+	eventually(t, "a gap", func() bool {
+		kinds := s.gapKinds()
+		return len(kinds) == 1 && kinds[0] == store.GapLogDamaged
+	})
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	g := s.gaps[0]
+	if !g.From.Equal(t0.Add(time.Second)) || !g.To.Equal(t0.Add(3*time.Second)) {
+		t.Errorf("gap = %v to %v", g.From, g.To)
+	}
+	if !s.rows["web"].Damaged {
+		t.Error("the container should be marked damaged")
+	}
+}
+
+func TestNormalBacklogIsNotASkip(t *testing.T) {
+	d, s := newFakeDocker(), newFakeStore()
+	d.add(running("web"))
+	d.write("web", t0.Add(time.Second), "one")
+	stop := run(t, d, s)
+	waitFor(t, s, "one")
+	stop()
+	d.write("web", t0.Add(2*time.Second), "two")
+	d.write("web", t0.Add(3*time.Second), "three")
+	run(t, d, s)
+	waitFor(t, s, "one", "two", "three")
+	d.write("web", t0.Add(4*time.Second), "four")
+	waitFor(t, s, "one", "two", "three", "four")
+	if gaps := s.gapKinds(); len(gaps) != 0 {
+		t.Errorf("gaps = %v", gaps)
+	}
+}
+
+func TestDockerAnsweringDoesNotClearADatabaseError(t *testing.T) {
+	c := New(Options{Log: quiet})
+	c.dbErr = "database: down"
+	c.clearProblem(&c.dockerErr)
+	if c.dbErr == "" {
+		t.Error("a proxy success cleared the database's error")
 	}
 }

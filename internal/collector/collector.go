@@ -8,6 +8,7 @@
 package collector
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -43,6 +44,9 @@ const (
 
 	// minGap is the shortest stretch worth recording for a damaged log.
 	minGap = time.Second
+
+	// orderSlack allows for stdout and stderr lines stamped slightly out of order.
+	orderSlack = int64(time.Millisecond)
 )
 
 // timing holds the loop's intervals; tests shorten them.
@@ -64,7 +68,7 @@ var defaultTiming = timing{
 	stuck:       30 * time.Second,
 	quiet:       30 * time.Second,
 	retry:       5 * time.Second,
-	firstRetain: time.Minute,
+	firstRetain: 30 * time.Second,
 	retain:      time.Hour,
 }
 
@@ -117,7 +121,8 @@ type Collector struct {
 	lastRead     *time.Time
 	lastSaved    *time.Time
 	lag          float64
-	lastErr      string
+	dbErr        string
+	dockerErr    string
 }
 
 // container is one container being followed.
@@ -149,8 +154,12 @@ type event struct {
 	raw    lines.Raw
 	rec    lines.Record
 	opened bool // the stream is open
-	ended  bool
-	err    error
+
+	skipped  bool // the stream jumped past lines it should have delivered
+	from, to int64
+
+	ended bool
+	err   error
 }
 
 // New returns a collector.
@@ -220,7 +229,7 @@ func (c *Collector) connect(ctx context.Context) bool {
 		if err == nil {
 			return true
 		}
-		c.problem("the database isn't ready: retrying", err)
+		c.problem(&c.dbErr, "the database isn't ready: retrying", err)
 		c.beat()
 		select {
 		case <-ctx.Done():
@@ -260,7 +269,7 @@ func (c *Collector) open(ctx context.Context) error {
 		c.tracked[t.DockerID] = &container{Tracked: t}
 	}
 	c.db = db
-	c.clearProblem()
+	c.dbErr = ""
 	c.opts.Log.Info("collector ready", "containers", len(known))
 	return nil
 }
@@ -277,7 +286,7 @@ drain:
 	for {
 		select {
 		case ev := <-c.events:
-			if !ev.ended && !ev.opened {
+			if !ev.ended && !ev.opened && !ev.skipped {
 				c.add(ev)
 			}
 		default:
@@ -296,6 +305,10 @@ func (c *Collector) handle(ctx context.Context, ev event) {
 	}
 	if ev.opened {
 		ev.c.refused = false
+		return
+	}
+	if ev.skipped {
+		c.skipped(ctx, ev)
 		return
 	}
 	if !ev.ended {
@@ -328,6 +341,29 @@ func (c *Collector) handle(ctx context.Context, ev event) {
 		}
 		t.setState("failed", ev.err.Error())
 	}
+}
+
+// skipped records lines a stream jumped over. Docker does this at a damaged
+// part of a log: with no error, it carries on with new lines.
+func (c *Collector) skipped(ctx context.Context, ev event) {
+	c.opts.Log.Warn("a log stream skipped lines, probably at a damaged part of the log", "container", ev.c.info.Name)
+	now := c.opts.Now()
+	callCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), callTimeout)
+	defer cancel()
+	err := c.db.SetDamaged(callCtx, ev.c.ID, store.Gap{
+		Kind: store.GapLogDamaged, ContainerID: &ev.c.ID, From: time.Unix(0, ev.from), To: time.Unix(0, ev.to), NotedAt: now,
+		Detail: damagedDetail(ev.c.info.Name),
+	})
+	if err != nil {
+		c.databaseFailed(err)
+		return
+	}
+	ev.c.Damaged = true
+}
+
+// damagedDetail explains a log_damaged gap.
+func damagedDetail(name string) string {
+	return fmt.Sprintf("%s's Docker log can't be read past a damaged part: lines in this stretch are lost, and it's read from its end until the container is replaced", name)
 }
 
 // add puts a line in the next batch.
@@ -372,13 +408,13 @@ func (c *Collector) flush(ctx context.Context) {
 		err = c.db.Save(saveCtx, c.pending, now)
 	}
 	if err != nil {
-		c.problem("saving failed: reopening the streams once the database answers", err)
+		c.problem(&c.dbErr, "saving failed: reopening the streams once the database answers", err)
 		c.pending, c.pendingBytes = store.Batch{}, 0
 		c.pause(now)
 		return
 	}
 
-	c.clearProblem()
+	c.clearProblem(&c.dbErr)
 	c.lastSaved = &now
 	c.lag = 0
 	for _, t := range c.tracked {
@@ -421,11 +457,11 @@ func (c *Collector) scan(ctx context.Context) {
 	answer, err := c.opts.Docker.Containers(callCtx)
 	if err != nil {
 		if ctx.Err() == nil {
-			c.problem("the proxy isn't answering: retrying", err)
+			c.problem(&c.dockerErr, "the proxy isn't answering: retrying", err)
 		}
 		return
 	}
-	c.clearProblem()
+	c.clearProblem(&c.dockerErr)
 
 	present := make(map[string]bool, len(answer.Containers)+len(answer.Failed))
 	for _, f := range answer.Failed {
@@ -520,7 +556,7 @@ func (c *Collector) follow(ctx context.Context, t *container) bool {
 		if now.Sub(from) >= minGap {
 			err := c.db.SetDamaged(ctx, t.ID, store.Gap{
 				Kind: store.GapLogDamaged, ContainerID: &t.ID, From: from, To: now, NotedAt: now,
-				Detail: fmt.Sprintf("%s's Docker log can't be read past a damaged part: only new lines are collected until the container is replaced", t.info.Name),
+				Detail: damagedDetail(t.info.Name),
 			})
 			if err != nil {
 				c.databaseFailed(err)
@@ -555,6 +591,18 @@ func (c *Collector) read(ctx context.Context, t *container, s *stream, id string
 		}
 	}
 
+	// The newest line now must arrive before any later one. If a later one
+	// comes first, Docker jumped over the backlog.
+	var expected int64
+	if !start.FromEnd {
+		callCtx, cancel := context.WithTimeout(ctx, callTimeout)
+		if latest, ok, err := c.opts.Docker.Latest(callCtx, id); err == nil && ok && latest.UnixNano() > after {
+			expected = latest.UnixNano()
+		}
+		cancel()
+	}
+	last := after
+
 	body, err := c.opts.Docker.Stream(ctx, id, start)
 	if err != nil {
 		send(event{ended: true, err: err})
@@ -576,8 +624,20 @@ func (c *Collector) read(ctx context.Context, t *container, s *stream, id string
 			send(event{ended: true, err: err})
 			return
 		}
-		if !raw.Time.IsZero() && raw.Time.UnixNano() <= after {
-			continue
+		if !raw.Time.IsZero() {
+			ns := raw.Time.UnixNano()
+			if ns <= after {
+				continue
+			}
+			if expected != 0 && ns > expected+orderSlack {
+				if !send(event{skipped: true, from: last, to: ns}) {
+					return
+				}
+				expected = 0
+			} else if ns >= expected {
+				expected = 0
+			}
+			last = ns
 		}
 		if !send(event{raw: raw, rec: lines.Parse(raw.Text)}) {
 			return
@@ -674,7 +734,7 @@ func (c *Collector) report(ctx context.Context) {
 	now := c.opts.Now()
 	st := store.CollectorStatus{
 		HeartbeatAt: now, Version: c.opts.Version, LastReadAt: c.lastRead, LastPersistedAt: c.lastSaved,
-		LagSeconds: c.lag, LastError: c.lastErr,
+		LagSeconds: c.lag, LastError: cmp.Or(c.dbErr, c.dockerErr),
 	}
 	var streams []store.StreamReport
 	seen := make([]int32, 0, len(c.tracked))
@@ -697,7 +757,7 @@ func (c *Collector) report(ctx context.Context) {
 		for _, t := range c.tracked {
 			t.reported = ""
 		}
-		c.problem("saving the status failed", err)
+		c.problem(&c.dbErr, "saving the status failed", err)
 	}
 }
 
@@ -707,7 +767,7 @@ func (c *Collector) retain(ctx context.Context) {
 	defer cancel()
 	deleted, stored, err := c.db.Retain(callCtx, c.opts.Now())
 	if err != nil {
-		c.problem("retention failed", err)
+		c.problem(&c.dbErr, "retention failed", err)
 		return
 	}
 	if deleted > 0 {
@@ -717,23 +777,24 @@ func (c *Collector) retain(ctx context.Context) {
 
 // databaseFailed stops reading until the database answers again.
 func (c *Collector) databaseFailed(err error) {
-	c.problem("the database failed: reopening the streams once it answers", err)
+	c.problem(&c.dbErr, "the database failed: reopening the streams once it answers", err)
 	c.pause(c.opts.Now())
 }
 
-// problem logs a new problem once and keeps it for `status`.
-func (c *Collector) problem(msg string, err error) {
+// problem logs a new problem once and keeps it in slot for `status`. Each
+// source has its own slot, so Docker answering doesn't clear a database error.
+func (c *Collector) problem(slot *string, msg string, err error) {
 	text := err.Error()
-	if text != c.lastErr {
+	if text != *slot {
 		c.opts.Log.Error(msg, "err", err)
 	}
-	c.lastErr = text
+	*slot = text
 }
 
-func (c *Collector) clearProblem() {
-	if c.lastErr != "" {
+func (c *Collector) clearProblem(slot *string) {
+	if *slot != "" {
 		c.opts.Log.Info("working again")
-		c.lastErr = ""
+		*slot = ""
 	}
 }
 
