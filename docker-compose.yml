@@ -1,0 +1,88 @@
+name: blackbox
+
+x-lighthouse:
+  deploy: releases
+
+# Secrets are only passed through: each line names a Cove key, Lighthouse
+# fills it in at deploy, and the container sees it under the same name.
+# Every other setting is in the code.
+
+services:
+  blackbox-proxy:
+    build: .
+    container_name: blackbox-proxy
+    command: ["/blackbox", "proxy"]
+    restart: unless-stopped
+    network_mode: none                 # reached only through the socket in the proxy volume
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 64m
+    pids_limit: 64
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock   # this service only (Lighthouse policy.json)
+      - proxy:/run/blackbox-proxy
+    healthcheck:
+      test: ["CMD", "/blackbox", "health", "proxy"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  blackbox-collector:
+    build: .
+    container_name: blackbox-collector
+    command: ["/blackbox", "collector"]
+    restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    environment:
+      - BLACKBOX_DATABASE_URL=${BLACKBOX_DATABASE_URL}
+      - BLACKBOX_DATABASE_MIGRATOR_URL=${BLACKBOX_DATABASE_MIGRATOR_URL}
+      - BLACKBOX_VERSION=${LIGHTHOUSE_DEPLOY_VERSION:-dev}
+    volumes:
+      - proxy:/run/blackbox-proxy
+    tmpfs:
+      - /run/blackbox:uid=10001,size=1m   # the heartbeat its healthcheck reads
+    healthcheck:
+      test: ["CMD", "/blackbox", "health", "collector"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks: [spark]
+
+  blackbox-api:
+    build: .
+    container_name: blackbox-api
+    command: ["/blackbox", "api"]
+    restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    expose: ["2600"]                   # documents the port; not published
+    environment:
+      - BLACKBOX_DATABASE_READER_URL=${BLACKBOX_DATABASE_READER_URL}
+      - BLACKBOX_CLI_TOKEN=${BLACKBOX_CLI_TOKEN}
+      - BLACKBOX_VERSION=${LIGHTHOUSE_DEPLOY_VERSION:-dev}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro   # the CLI shows the server's local time
+    healthcheck:
+      test: ["CMD", "/blackbox", "health", "api"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks: [spark]
+
+volumes:
+  proxy:   # the proxy's socket; mounted by the proxy and the collector only
+
+networks:
+  spark:
+    external: true
