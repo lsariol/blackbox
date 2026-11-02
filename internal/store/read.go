@@ -296,6 +296,7 @@ type StreamProblem struct {
 	Container string
 	State     string
 	LastError string
+	Damaged   bool
 }
 
 // Status is everything `status` shows.
@@ -344,7 +345,7 @@ func (s *Store) ReadStatus(ctx context.Context, now time.Time) (Status, error) {
 	}
 
 	rows, err := s.pool.Query(ctx, `
-		SELECT name, stream_state, last_error FROM blackbox.containers
+		SELECT name, stream_state, last_error, damaged_at IS NOT NULL FROM blackbox.containers
 		 WHERE removed_at IS NULL AND (last_error <> '' OR stream_state IN ('failed', 'refused') OR damaged_at IS NOT NULL)
 		 ORDER BY name`)
 	if err != nil {
@@ -352,7 +353,7 @@ func (s *Store) ReadStatus(ctx context.Context, now time.Time) (Status, error) {
 	}
 	st.Problems, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) (StreamProblem, error) {
 		var p StreamProblem
-		err := row.Scan(&p.Container, &p.State, &p.LastError)
+		err := row.Scan(&p.Container, &p.State, &p.LastError, &p.Damaged)
 		return p, err
 	})
 	if err != nil {
