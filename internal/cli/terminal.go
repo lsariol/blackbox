@@ -6,6 +6,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"golang.org/x/term"
 )
@@ -54,17 +55,8 @@ func (c *CLI) complete(line string, pos int, key rune) (string, int, bool) {
 	word := head[start:]
 	before := strings.Fields(head[:start])
 
-	var candidates []string
-	switch len(before) {
-	case 0:
-		candidates = c.commandNames()
-	case 1:
-		cmd, ok := c.byName[strings.ToLower(before[0])]
-		if !ok || cmd.complete == nil {
-			return "", 0, false
-		}
-		candidates = cmd.complete(c)
-	default:
+	candidates, ok := c.candidates(before, word)
+	if !ok {
 		return "", 0, false
 	}
 
@@ -88,6 +80,68 @@ func (c *CLI) complete(line string, pos int, key rune) (string, int, bool) {
 		return "", 0, false
 	}
 	return head[:start] + completed + tail, start + len(completed), true
+}
+
+// candidates is what the word being typed could become: command names, then
+// the command's own completions, its flags, or the values of a name flag.
+func (c *CLI) candidates(before []string, word string) ([]string, bool) {
+	if len(before) == 0 {
+		return c.commandNames(), true
+	}
+	cmd, ok := c.byName[strings.ToLower(before[0])]
+	if !ok {
+		return nil, false
+	}
+	last := before[len(before)-1]
+	switch {
+	case strings.HasPrefix(word, "--"):
+		var names []string
+		for _, f := range cmd.flags {
+			names = append(names, strings.Fields(f.name)[0])
+		}
+		return names, true
+	case last == "--project" || last == "--service" || last == "--container" || last == "--version":
+		return c.sourceValues(last), true
+	case len(before) == 1 && cmd.complete != nil:
+		return cmd.complete(c), true
+	}
+	return nil, false
+}
+
+// sourceValues lists what a name flag can be, from what's stored. Tab must
+// never fail loudly, so a failed call offers nothing.
+func (c *CLI) sourceValues(flag string) []string {
+	client, err := c.client()
+	if err != nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	answer, err := client.Sources(ctx)
+	if err != nil {
+		return nil
+	}
+	seen := make(map[string]bool)
+	for _, s := range answer.Sources {
+		switch flag {
+		case "--project":
+			if s.Project != nil {
+				seen[*s.Project] = true
+			}
+		case "--version":
+			for _, v := range s.Versions {
+				seen[v] = true
+			}
+		default:
+			seen[s.Service] = true
+		}
+	}
+	var names []string
+	for name := range seen {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // commandNames returns every command's primary name, sorted.

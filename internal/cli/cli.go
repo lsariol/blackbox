@@ -8,18 +8,35 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"time"
 
 	"golang.org/x/term"
+
+	"github.com/lsariol/blackbox/internal/api"
 )
 
-// Options are the CLI's settings.
+// Options are the CLI's settings and where its data comes from.
 type Options struct {
 	Env     string
 	Version string
-	Now     func() time.Time // time.Now unless set
+
+	API       func() (API, error)
+	Consumers func() []api.ConsumerInfo
+	Now       func() time.Time // time.Now unless set
+}
+
+// API is blackbox-api, as the CLI uses it.
+type API interface {
+	Logs(ctx context.Context, query url.Values) (api.LogsAnswer, error)
+	Record(ctx context.Context, id int64) (api.Record, error)
+	Context(ctx context.Context, id int64, before, after int) (api.ContextAnswer, error)
+	Sources(ctx context.Context) (api.SourcesAnswer, error)
+	Gaps(ctx context.Context, from time.Time) (api.GapsAnswer, error)
+	Status(ctx context.Context) (api.StatusAnswer, error)
+	Migrations(ctx context.Context) (api.MigrationsAnswer, error)
 }
 
 // CLI runs Blackbox's commands, one at a time or as a shell.
@@ -104,12 +121,23 @@ func report(err error) {
 	if err == nil {
 		return
 	}
+	if errors.Is(err, errReported) {
+		return
+	}
 	var usage usageError
 	if errors.As(err, &usage) {
 		warn(err.Error())
 		return
 	}
 	fail(err.Error())
+}
+
+// client returns the API, or says where the CLI has to run.
+func (c *CLI) client() (API, error) {
+	if c.opts.API == nil {
+		return nil, errors.New("API: not available here: run the CLI in blackbox-api (docker exec -it blackbox-api /blackbox shell)")
+	}
+	return c.opts.API()
 }
 
 // splitArgs splits a typed line at spaces, keeping "quoted text" together.
