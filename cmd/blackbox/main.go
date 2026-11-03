@@ -15,6 +15,8 @@ import (
 	"time"
 	_ "time/tzdata" // TZ works on an image without zoneinfo
 
+	"github.com/lsariol/blackboxlog"
+
 	"github.com/lsariol/blackbox/internal/api"
 	"github.com/lsariol/blackbox/internal/cli"
 	"github.com/lsariol/blackbox/internal/collector"
@@ -70,7 +72,7 @@ Run "blackbox help" to list the CLI commands.
 // runProxy runs blackbox-proxy until SIGINT or SIGTERM (docker stop).
 func runProxy() {
 	cfg := loadConfig()
-	log := newLogger(cfg, "proxy")
+	log := newLogger("proxy")
 	log.Info("Blackbox starting", "version", cfg.Version, "env", cfg.Env)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -84,7 +86,7 @@ func runProxy() {
 // runCollector runs blackbox-collector until SIGINT or SIGTERM (docker stop).
 func runCollector() {
 	cfg := loadConfig()
-	log := newLogger(cfg, "collector")
+	log := newLogger("collector")
 	log.Info("Blackbox starting", "version", cfg.Version, "env", cfg.Env)
 
 	migratorURL, err := config.Secret(os.Getenv, "BLACKBOX_DATABASE_MIGRATOR_URL")
@@ -127,7 +129,7 @@ func runCollector() {
 // runAPI runs blackbox-api until SIGINT or SIGTERM (docker stop).
 func runAPI() {
 	cfg := loadConfig()
-	log := newLogger(cfg, "api")
+	log := newLogger("api")
 	log.Info("Blackbox starting", "version", cfg.Version, "env", cfg.Env)
 
 	readerURL, err := config.Secret(os.Getenv, "BLACKBOX_DATABASE_READER_URL")
@@ -201,22 +203,9 @@ func runHealth(args []string) int {
 	return 0
 }
 
-// newLogger logs to stderr, as Spark's logging standard asks: JSON records with
-// UTC times, or text when APP_ENV=dev, tagged with the part they come from.
-func newLogger(cfg config.Config, part string) *slog.Logger {
-	opts := &slog.HandlerOptions{
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			if a.Key == slog.TimeKey && len(groups) == 0 {
-				a.Value = slog.TimeValue(a.Value.Time().UTC())
-			}
-			return a
-		},
-	}
-	var h slog.Handler = slog.NewJSONHandler(os.Stderr, opts)
-	if cfg.Env == "dev" {
-		h = slog.NewTextHandler(os.Stderr, opts)
-	}
-	return slog.New(h).With("component", part)
+// newLogger follows Spark's logging standard, tagged with the part logging.
+func newLogger(part string) *slog.Logger {
+	return blackboxlog.New(blackboxlog.Options{}).With("component", part)
 }
 
 // runShell runs the interactive CLI until exit, end of input, or SIGTERM.

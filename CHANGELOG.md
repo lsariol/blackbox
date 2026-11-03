@@ -17,3 +17,4 @@ First version: every container's logs, collected, kept for 30 days and searchabl
 - Retention of 30 days, with a 1 GB cap that removes the oldest records first.
 - `blackbox-api`: authenticated search, single records, surrounding lines, sources, gaps and status, on `blackbox-api:2600`.
 - The CLI: `search`, `show`, `context`, `status`, `sources`, `gaps`, `consumers`, `migrate status`, `version`, `help`.
+- Blackbox's own logs follow Spark's logging standard, through `blackboxlog`.
