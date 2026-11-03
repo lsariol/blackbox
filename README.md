@@ -15,7 +15,7 @@ One Go binary, run as three containers:
 |---|---|
 | `blackbox-proxy` | The only part with the Docker socket. No network; lists containers and passes log bytes through without reading them |
 | `blackbox-collector` | Follows every container's log, parses and redacts each line, saves it to sparkdb, and runs the migrations |
-| `blackbox-api` | Serves searches and collection status to authenticated consumers on `blackbox-api:2600` (the `spark` network) |
+| `blackbox-api` | Serves searches and collection status to authenticated consumers on `blackbox-api:3190` (the `spark` network) |
 
 ## What it does when things go wrong
 
@@ -61,7 +61,7 @@ One-time setup, in the repo folder:
 2. On `sparkdb-dev` (`localhost:5000`), run `scripts/db/setup.sql` as the admin user, with dev passwords.
 3. Copy `.env.example` to `.env` (gitignored) and fill in the dev values: the three database URLs pointing at `host.docker.internal:5000`, and a dev API token.
 
-`docker-compose.dev.yml` publishes the API on `127.0.0.1:2601`. All three containers turn `healthy` in `docker ps`, and `docker exec blackbox-api /blackbox status` prints no "Needs attention" line.
+`docker-compose.dev.yml` publishes the API on `127.0.0.1:3191`. All three containers turn `healthy` in `docker ps`, and `docker exec blackbox-api /blackbox status` prints no "Needs attention" line.
 
 ```bash
 go test ./...                                              # the tests

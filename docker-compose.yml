@@ -65,7 +65,7 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     mem_limit: 128m
-    expose: ["2600"]                   # documents the port; not published
+    expose: ["3190"]                   # documents the port; not published
     environment:
       - BLACKBOX_DATABASE_READER_URL=${BLACKBOX_DATABASE_READER_URL}
       - BLACKBOX_CLI_TOKEN=${BLACKBOX_CLI_TOKEN}

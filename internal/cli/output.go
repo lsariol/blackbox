@@ -52,9 +52,10 @@ func clean(s string) string {
 	}, s)
 }
 
-// cell is clean for one table cell or field: on a single line.
+// cell is clean for one table cell or field: on a single line, with tabs as
+// spaces, since a tab would start a new column.
 func cell(s string) string {
-	return strings.ReplaceAll(clean(s), "\n", " ")
+	return clean(strings.NewReplacer("\n", " ", "\t", " ").Replace(s))
 }
 
 // out writes data to stdout, followed by a newline.

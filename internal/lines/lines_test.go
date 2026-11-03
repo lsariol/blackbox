@@ -232,6 +232,9 @@ func TestRedaction(t *testing.T) {
 		{"database URL", "connect postgres://blackbox_app:" + value + "@sparkdb:5432/blackbox_db failed"},
 		{"authorization header", "Authorization: Basic " + value},
 		{"cookie header", "Set-Cookie: session=" + value},
+		{"request cookie", "Cookie: a=1; session=" + value},
+		{"cookie setting", "cookie=" + value},
+		{"cookie in JSON text", `sent {"cookie":"` + value + `"}`},
 		{"token", "token=" + value + " more"},
 		{"access token", "access_token=" + value + "&x=1"},
 		{"password with a colon", `password: "` + value + `"`},
@@ -271,6 +274,8 @@ func TestRedactionLeavesOrdinaryTextAlone(t *testing.T) {
 		"http://sonar-api:2500/v1/status",
 		"the password was wrong",
 		"bearer",
+		"[2026-11-03 00:51:13.72] VulpesHD  : @Supibot    - onreeee, Your daily cookie: Sugar cookie, enjoy!",
+		"Your received cookie: a cookie from a friend",
 	} {
 		rec := Parse([]byte(line))
 		if rec.Message != line || rec.Redacted {

@@ -92,3 +92,9 @@ func TestPrompt(t *testing.T) {
 		t.Errorf("prompt = %q", got)
 	}
 }
+
+func TestCellKeepsOneLineAndOneColumn(t *testing.T) {
+	if got := cell("a\tb\nc\x1bd"); got != "a b c?d" {
+		t.Errorf("cell = %q", got)
+	}
+}

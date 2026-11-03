@@ -2,6 +2,17 @@
 
 All notable changes to Blackbox. Versions follow [semantic versioning](https://semver.org).
 
+## v0.0.1 (2026-11-02)
+
+Small fixes from Blackbox's first day collecting real logs.
+
+### Changed
+- **The API moved to port 3190** (`blackbox-api:3190` on `spark`), and to 3191 for local development. It stays unpublished in prod.
+
+### Fixed
+- **Ordinary sentences about cookies are no longer hidden:** chat lines such as "Your daily cookie: …" were redacted as if they were `Cookie:` headers. Real cookie headers and `cookie=` values still are.
+- **Tabs in log lines show as spaces in the CLI**, not `?`. Multi-line Postgres statements are readable now.
+
 ## v0.0.0 (2026-11-02)
 
 First version: every container's logs, collected, kept for 30 days and searchable from the CLI.

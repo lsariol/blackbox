@@ -19,7 +19,9 @@ var sensitiveWords = []string{
 var patterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)(\bbearer\s+)[a-z0-9._~+/=-]+`),
 	regexp.MustCompile(`(?i)(\b[a-z][a-z0-9+.-]*://[^\s:/@]*:)[^\s/@]+(?:@)`),
-	regexp.MustCompile(`(?i)(\b(?:set-)?(?:authorization|cookie)["']?\s*[:=]\s*).*$`),
+	regexp.MustCompile(`(?i)(\bauthorization["']?\s*[:=]\s*).*$`),
+	// A cookie header holds name=value pairs; "your cookie: ..." in a sentence doesn't.
+	regexp.MustCompile(`(?i)(\b(?:set-)?cookie(?:\s*=\s*|\s*:\s*[^\s=;]+=|["']\s*[:=]\s*["']?)).*$`),
 	regexp.MustCompile(`(?i)([a-z0-9_-]*(?:password|passwd|secret|token|api[_-]?key)(?:[_-][a-z0-9_-]+)?["']?\s*[:=]\s*["']?)[^\s"'&,;]+`),
 }
 

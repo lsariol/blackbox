@@ -16,4 +16,4 @@ services:
       - APP_ENV=dev
       - TZ=${TZ:-UTC}                      # Docker Desktop's VM runs on UTC
     ports:
-      - "127.0.0.1:2601:2600"
+      - "127.0.0.1:3191:3190"
