@@ -17,7 +17,13 @@ import (
 	"github.com/lsariol/blackbox/internal/store"
 )
 
-const token = "0123456789abcdef0123456789abcdef"
+const (
+	token      = "0123456789abcdef0123456789abcdef"
+	vistaToken = "fedcba9876543210fedcba9876543210"
+)
+
+// tokens are the test server's environment: a token for every consumer.
+var tokens = map[string]string{"BLACKBOX_CLI_TOKEN": token, "SHARED_BLACKBOX_VISTA_TOKEN": vistaToken}
 
 var now = time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC)
 
@@ -67,7 +73,7 @@ func newServer(t *testing.T, db Reader) *Server {
 	t.Helper()
 	s, err := New(Options{
 		Version: "v0.0.0",
-		Getenv:  func(key string) string { return map[string]string{"BLACKBOX_CLI_TOKEN": token}[key] },
+		Getenv:  func(key string) string { return tokens[key] },
 		Log:     slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Now:     func() time.Time { return now },
 	})
@@ -117,6 +123,27 @@ func TestAuth(t *testing.T) {
 		}
 		if code, _, h := call(t, s, path, "wrong"); code != http.StatusUnauthorized || h.Get("WWW-Authenticate") == "" {
 			t.Errorf("%s with a wrong token: %d", path, code)
+		}
+	}
+}
+
+func TestRefusesToStartWithoutVistasToken(t *testing.T) {
+	_, err := New(Options{Getenv: func(key string) string {
+		if key == "SHARED_BLACKBOX_VISTA_TOKEN" {
+			return ""
+		}
+		return tokens[key]
+	}})
+	if err == nil || !strings.Contains(err.Error(), "SHARED_BLACKBOX_VISTA_TOKEN") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestVistaReadsLogs(t *testing.T) {
+	s := newServer(t, &fakeReader{})
+	for _, path := range []string{"/v1/logs", "/v1/logs/1/context", "/v1/sources", "/v1/gaps", "/v1/status"} {
+		if code, body, _ := call(t, s, path, vistaToken); code != http.StatusOK {
+			t.Errorf("%s with Vista's token: %d %s", path, code, body)
 		}
 	}
 }

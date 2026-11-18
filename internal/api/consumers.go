@@ -25,6 +25,7 @@ type consumer struct {
 // its key in Cove, and its pass-through line in docker-compose.yml.
 var consumers = []consumer{
 	{Name: "cli", Key: "BLACKBOX_CLI_TOKEN", Scopes: []scope{logsRead}},
+	{Name: "vista", Key: "SHARED_BLACKBOX_VISTA_TOKEN", Scopes: []scope{logsRead}},
 }
 
 // minTokenLength is the shortest token the API accepts from Cove.

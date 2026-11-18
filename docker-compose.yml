@@ -69,6 +69,7 @@ services:
     environment:
       - BLACKBOX_DATABASE_READER_URL=${BLACKBOX_DATABASE_READER_URL}
       - BLACKBOX_CLI_TOKEN=${BLACKBOX_CLI_TOKEN}
+      - SHARED_BLACKBOX_VISTA_TOKEN=${SHARED_BLACKBOX_VISTA_TOKEN}
       - BLACKBOX_VERSION=${LIGHTHOUSE_DEPLOY_VERSION:-dev}
     volumes:
       - /etc/localtime:/etc/localtime:ro   # the CLI shows the server's local time

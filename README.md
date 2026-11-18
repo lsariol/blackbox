@@ -1,6 +1,6 @@
 # Blackbox
 
-Spark's private log store. It reads every container's output from Docker, keeps it in sparkdb for 30 days, so logs survive a container being replaced, and answers searches through an authenticated API. Its first consumer is its own CLI; Vista comes later on the same API.
+Spark's private log store. It reads every container's output from Docker, keeps it in sparkdb for 30 days, so logs survive a container being replaced, and answers searches through an authenticated API. Its consumers are its own CLI and Vista, Spark's dashboard.
 
 Blackbox collects, stores and searches diagnostic logs. It never changes a container, and it isn't a place for records that must not be lost: those belong in a project's own database.
 
@@ -59,7 +59,7 @@ One-time setup, in the repo folder:
 
 1. `docker network create spark`, if it doesn't exist yet.
 2. On `sparkdb-dev` (`localhost:5000`), run `scripts/db/setup.sql` as the admin user, with dev passwords.
-3. Copy `.env.example` to `.env` (gitignored) and fill in the dev values: the three database URLs pointing at `host.docker.internal:5000`, and a dev API token.
+3. Copy `.env.example` to `.env` (gitignored) and fill in the dev values: the three database URLs pointing at `host.docker.internal:5000`, and a dev token for each API consumer.
 
 `docker-compose.dev.yml` publishes the API on `127.0.0.1:3191`. All three containers turn `healthy` in `docker ps`, and `docker exec blackbox-api /blackbox status` prints no "Needs attention" line.
 
@@ -75,4 +75,4 @@ In Git Bash on Windows, set `MSYS_NO_PATHCONV=1` first, or `docker exec … /bla
 
 ## Deploying
 
-Lighthouse deploys it on version tags. It needs Lighthouse's `policy.json` to allow the Docker socket for `blackbox-proxy`, the `blackbox_db` database with its roles (`scripts/db/setup.sql`), and four keys in Cove: `BLACKBOX_DATABASE_URL`, `BLACKBOX_DATABASE_MIGRATOR_URL`, `BLACKBOX_DATABASE_READER_URL` and `BLACKBOX_CLI_TOKEN`.
+Lighthouse deploys it on version tags. It needs Lighthouse's `policy.json` to allow the Docker socket for `blackbox-proxy`, the `blackbox_db` database with its roles (`scripts/db/setup.sql`), and five keys in Cove: `BLACKBOX_DATABASE_URL`, `BLACKBOX_DATABASE_MIGRATOR_URL`, `BLACKBOX_DATABASE_READER_URL`, `BLACKBOX_CLI_TOKEN` and `SHARED_BLACKBOX_VISTA_TOKEN`. The API doesn't start without every consumer's token.
