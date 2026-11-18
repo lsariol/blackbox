@@ -121,6 +121,26 @@ func commandTable() []command {
 			run:      (*CLI).context,
 		},
 		{
+			names:    []string{"errors"},
+			group:    groupOverview,
+			synopsis: "[--since 24h] [flags]",
+			summary:  "Repeated errors, grouped, most first",
+			usages: []usage{
+				{"errors", "List error lines grouped by project, service and fingerprint: the message and its err field, with ids shown as <id> and numbers as <n>. Each group shows how many lines it has, when it was first and last seen, and its newest line, for show and context. Lines with no level aren't included."},
+			},
+			flags: []flag{
+				{"--since 24h", "How far back: 6h, 7d, up to 31d. 24h unless given."},
+				{"--project NAME", "Only this project. May repeat."},
+				{"--level LEVEL", "error, or warn for warnings too. error unless given."},
+				{"--limit N", "Groups to list, up to 500. 50 unless given."},
+			},
+			examples: []example{
+				{"errors --since 7d", "what kept failing this week"},
+				{"errors --project lys --level warn", "one project's warnings and errors"},
+			},
+			run: (*CLI).errors,
+		},
+		{
 			names:   []string{"status", "st"},
 			group:   groupOverview,
 			summary: "Is collection healthy?",

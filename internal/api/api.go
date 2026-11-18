@@ -39,6 +39,13 @@ const (
 	maxText        = 256
 	defaultRange   = time.Hour
 
+	// The error statistics: the last day unless asked, at most a little over
+	// what's kept.
+	defaultStatsRange = 24 * time.Hour
+	maxStatsRange     = 31 * 24 * time.Hour
+	defaultGroups     = 50
+	maxGroups         = 500
+
 	// staleAfter is how old the collector's report may be.
 	staleAfter = 30 * time.Second
 
@@ -57,6 +64,8 @@ type Reader interface {
 	Sources(ctx context.Context) ([]store.Source, error)
 	Gaps(ctx context.Context, from, to time.Time) ([]store.GapRow, error)
 	ReadStatus(ctx context.Context, now time.Time) (store.Status, error)
+	ErrorCounts(ctx context.Context, from, to time.Time, bucket store.Bucket, projects []string) ([]store.ErrorCount, error)
+	ErrorGroups(ctx context.Context, q store.GroupsQuery) ([]store.ErrorGroup, int64, error)
 	Migrations(ctx context.Context) ([]store.Migration, error)
 	CheckSchemaVersion(ctx context.Context) error
 	Ping(ctx context.Context) error
@@ -108,8 +117,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/gaps", s.require(logsRead, s.gaps))
 	mux.HandleFunc("GET /v1/status", s.require(logsRead, s.status))
 	mux.HandleFunc("GET /v1/migrations", s.require(logsRead, s.migrations))
+	mux.HandleFunc("GET /v1/stats/errors", s.require(logsRead, s.errorCounts))
+	mux.HandleFunc("GET /v1/stats/errors/groups", s.require(logsRead, s.errorGroups))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		writeError(w, http.StatusNotFound, "no such endpoint: the API serves /healthz and /v1/logs, /v1/sources, /v1/gaps, /v1/status, /v1/migrations")
+		writeError(w, http.StatusNotFound, "no such endpoint: the API serves /healthz and /v1/logs, /v1/sources, /v1/gaps, /v1/status, /v1/migrations, /v1/stats/errors, /v1/stats/errors/groups")
 	})
 	return http.TimeoutHandler(securityHeaders(mux), requestTimeout, `{"error":"the request took too long"}`)
 }

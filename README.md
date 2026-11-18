@@ -15,7 +15,7 @@ One Go binary, run as three containers:
 |---|---|
 | `blackbox-proxy` | The only part with the Docker socket. No network; lists containers and passes log bytes through without reading them |
 | `blackbox-collector` | Follows every container's log, parses and redacts each line, saves it to sparkdb, and runs the migrations |
-| `blackbox-api` | Serves searches and collection status to authenticated consumers on `blackbox-api:3190` (the `spark` network) |
+| `blackbox-api` | Serves searches, error counts and collection status to authenticated consumers on `blackbox-api:3190` (the `spark` network) |
 
 ## What it does when things go wrong
 
@@ -42,6 +42,7 @@ docker exec blackbox-api /blackbox search --level error --since 6h
 | `search [text] [flags]` | Lines by time, project, service, container, version, level, stream, text or field |
 | `show <id>` | One line: every field |
 | `context <id>` | The lines around a line, for reading a stack trace |
+| `errors` | Repeated errors, grouped by project, service and message with ids and numbers taken out, most frequent first |
 | `status` | Collection health. Exits non-zero when something needs attention |
 | `sources` | Every project and service with logs |
 | `gaps` | Known and possible loss |

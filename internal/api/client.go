@@ -73,6 +73,14 @@ func (c *Client) Status(ctx context.Context) (StatusAnswer, error) {
 	return answer, err
 }
 
+// ErrorGroups lists repeated lines; query holds the parameters of
+// GET /v1/stats/errors/groups.
+func (c *Client) ErrorGroups(ctx context.Context, query url.Values) (ErrorGroupsAnswer, error) {
+	var answer ErrorGroupsAnswer
+	err := c.get(ctx, "/v1/stats/errors/groups", query, &answer)
+	return answer, err
+}
+
 // Migrations lists this build's migrations.
 func (c *Client) Migrations(ctx context.Context) (MigrationsAnswer, error) {
 	var answer MigrationsAnswer

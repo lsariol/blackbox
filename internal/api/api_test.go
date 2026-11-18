@@ -36,6 +36,20 @@ type fakeReader struct {
 	err    error
 	slow   bool
 	last   store.Query
+
+	counts     []store.ErrorCount
+	groups     []store.ErrorGroup
+	lastBucket store.Bucket
+	lastGroups store.GroupsQuery
+}
+
+func (f *fakeReader) ErrorCounts(ctx context.Context, from, to time.Time, bucket store.Bucket, projects []string) ([]store.ErrorCount, error) {
+	f.lastBucket = bucket
+	return f.counts, f.wait(ctx)
+}
+func (f *fakeReader) ErrorGroups(ctx context.Context, q store.GroupsQuery) ([]store.ErrorGroup, int64, error) {
+	f.lastGroups = q
+	return f.groups, int64(len(f.groups)) + 7, f.wait(ctx)
 }
 
 func (f *fakeReader) wait(ctx context.Context) error {
@@ -117,7 +131,8 @@ func TestRefusesToStartWithoutAToken(t *testing.T) {
 
 func TestAuth(t *testing.T) {
 	s := newServer(t, &fakeReader{})
-	for _, path := range []string{"/v1/logs", "/v1/logs/1", "/v1/logs/1/context", "/v1/sources", "/v1/gaps", "/v1/status", "/v1/migrations"} {
+	for _, path := range []string{"/v1/logs", "/v1/logs/1", "/v1/logs/1/context", "/v1/sources", "/v1/gaps", "/v1/status", "/v1/migrations",
+		"/v1/stats/errors", "/v1/stats/errors/groups"} {
 		if code, _, _ := call(t, s, path, ""); code != http.StatusUnauthorized {
 			t.Errorf("%s without a token: %d", path, code)
 		}
@@ -141,7 +156,8 @@ func TestRefusesToStartWithoutVistasToken(t *testing.T) {
 
 func TestVistaReadsLogs(t *testing.T) {
 	s := newServer(t, &fakeReader{})
-	for _, path := range []string{"/v1/logs", "/v1/logs/1/context", "/v1/sources", "/v1/gaps", "/v1/status"} {
+	for _, path := range []string{"/v1/logs", "/v1/logs/1/context", "/v1/sources", "/v1/gaps", "/v1/status",
+		"/v1/stats/errors", "/v1/stats/errors/groups"} {
 		if code, body, _ := call(t, s, path, vistaToken); code != http.StatusOK {
 			t.Errorf("%s with Vista's token: %d %s", path, code, body)
 		}

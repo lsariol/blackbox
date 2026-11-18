@@ -36,6 +36,7 @@ type API interface {
 	Sources(ctx context.Context) (api.SourcesAnswer, error)
 	Gaps(ctx context.Context, from time.Time) (api.GapsAnswer, error)
 	Status(ctx context.Context) (api.StatusAnswer, error)
+	ErrorGroups(ctx context.Context, query url.Values) (api.ErrorGroupsAnswer, error)
 	Migrations(ctx context.Context) (api.MigrationsAnswer, error)
 }
 

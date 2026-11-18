@@ -25,8 +25,14 @@ type fakeAPI struct {
 	gaps     api.GapsAnswer
 	status   api.StatusAnswer
 	migrated api.MigrationsAnswer
+	groups   api.ErrorGroupsAnswer
 	err      error
 	query    url.Values
+}
+
+func (f *fakeAPI) ErrorGroups(ctx context.Context, q url.Values) (api.ErrorGroupsAnswer, error) {
+	f.query = q
+	return f.groups, f.err
 }
 
 func (f *fakeAPI) Logs(ctx context.Context, q url.Values) (api.LogsAnswer, error) {
@@ -275,6 +281,38 @@ func TestSourcesAndGaps(t *testing.T) {
 	var usage usageError
 	if !errors.As(err, &usage) {
 		t.Errorf("err = %v", err)
+	}
+}
+
+func TestErrors(t *testing.T) {
+	f := &fakeAPI{groups: api.ErrorGroupsAnswer{TotalGroups: 3, Groups: []api.ErrorGroup{
+		{Fingerprint: "query failed after <n>ms", Project: ptr("lys"), Service: "bot", Level: "error", Count: 42,
+			FirstSeen: now.Add(-time.Hour), LastSeen: now, NewestID: 18234},
+		{Fingerprint: "bad\x1b[2Jline", Service: "ext", Level: "warn", Count: 1, FirstSeen: now, LastSeen: now, NewestID: 7},
+	}}}
+	o, e, err := exec(t, f, "errors --since 7d --project lys --level=warn --limit 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := f.query
+	if q.Get("project") != "lys" || q.Get("level") != "warn" || q.Get("limit") != "2" ||
+		q.Get("from") != now.Add(-7*24*time.Hour).Format(time.RFC3339) || q.Get("to") != now.Format(time.RFC3339) {
+		t.Errorf("query = %v", q)
+	}
+	for _, want := range []string{"COUNT", "42", "lys/bot", "18234", "query failed after <n>ms", "ext", "bad?[2Jline"} {
+		if !strings.Contains(o, want) {
+			t.Errorf("stdout is missing %q: %s", want, o)
+		}
+	}
+	if !strings.Contains(e, "2 of 3 groups: add --limit for more") {
+		t.Errorf("stderr: %s", e)
+	}
+
+	for _, line := range []string{"errors --since soon", "errors --level", "errors extra"} {
+		var usage usageError
+		if _, _, err := exec(t, f, line); !errors.As(err, &usage) {
+			t.Errorf("%q: err = %v", line, err)
+		}
 	}
 }
 

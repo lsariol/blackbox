@@ -84,6 +84,56 @@ type StatusAnswer struct {
 	Attention      []string   `json:"attention"`
 }
 
+// ErrorCountsAnswer is warn and error lines per project, per bucket and in all.
+// Buckets start on UTC hours or days; the first and last may be partial, and
+// buckets with no lines are left out.
+type ErrorCountsAnswer struct {
+	From    time.Time     `json:"from"`
+	To      time.Time     `json:"to"`
+	Bucket  string        `json:"bucket"`
+	Buckets []ErrorBucket `json:"buckets"`
+	Totals  []ErrorTotal  `json:"totals"`
+}
+
+// ErrorBucket is one project's lines in one bucket.
+type ErrorBucket struct {
+	Start   time.Time `json:"start"`
+	Project *string   `json:"project"`
+	Errors  int64     `json:"error"`
+	Warns   int64     `json:"warn"`
+}
+
+// ErrorTotal is one project's lines over the whole range.
+type ErrorTotal struct {
+	Project *string `json:"project"`
+	Errors  int64   `json:"error"`
+	Warns   int64   `json:"warn"`
+}
+
+// ErrorGroupsAnswer is repeated lines grouped by fingerprint, most lines first.
+type ErrorGroupsAnswer struct {
+	From        time.Time    `json:"from"`
+	To          time.Time    `json:"to"`
+	Level       string       `json:"level"` // the lowest level included
+	Groups      []ErrorGroup `json:"groups"`
+	TotalGroups int64        `json:"total_groups"` // before the limit
+}
+
+// ErrorGroup is the lines of one project and service, at one level, that
+// share a fingerprint: the message, plus its err field, with ids and numbers
+// replaced by <id> and <n>. Fingerprint and NewestMessage are untrusted text.
+type ErrorGroup struct {
+	Fingerprint   string    `json:"fingerprint"`
+	Project       *string   `json:"project"`
+	Service       string    `json:"service"`
+	Level         string    `json:"level"`
+	Count         int64     `json:"count"`
+	FirstSeen     time.Time `json:"first_seen"`
+	LastSeen      time.Time `json:"last_seen"`
+	NewestID      int64     `json:"newest_id"`
+	NewestMessage string    `json:"newest_message"`
+}
+
 // Migration is one of this build's migrations.
 type Migration struct {
 	Version   int64      `json:"version"`
