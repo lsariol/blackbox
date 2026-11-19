@@ -2,6 +2,28 @@
 
 All notable changes to Blackbox. Versions follow [semantic versioning](https://semver.org).
 
+## v0.0.2 (2026-11-18)
+
+Error counts and repeated errors, for the CLI and for Vista, Spark's dashboard, which becomes the API's second consumer.
+
+### Added
+- **Vista can use the API**, with its own token in `SHARED_BLACKBOX_VISTA_TOKEN` and the same read access as the CLI.
+- **`GET /v1/stats/errors`** counts error and warning lines per project, per hour or day, with each project's totals.
+- **`GET /v1/stats/errors/groups`** groups repeated lines by project, service, level and fingerprint: the message and its `err` field, with ids and numbers taken out. Each group has a count, when it was first and last seen, and its newest line, for `context`. Both endpoints cover the last 24 hours unless given a range, and at most 31 days.
+- **The CLI's `errors` command** lists the repeated errors, most frequent first; `--level warn` adds warnings.
+- An MIT `LICENSE`.
+
+### Changed
+- **`blackbox-api` needs a token for every consumer to start**, now including `SHARED_BLACKBOX_VISTA_TOKEN`.
+- The image runs as user 10001; only `blackbox-proxy` runs as root, set in the compose file, to read the Docker socket.
+- Blackbox's start line no longer repeats its version and environment, which are read from Docker.
+- Go 1.27.4.
+- The README is rewritten, with the features, the API and every setting.
+
+### Fixed
+- **A service that stops on an error logs why at `ERROR`**, instead of as plain text with no level, so searches and error counts include it.
+- A shutdown that runs past its time limit is logged instead of ignored.
+
 ## v0.0.1 (2026-11-02)
 
 Small fixes from Blackbox's first day collecting real logs.
