@@ -84,9 +84,7 @@ type StatusAnswer struct {
 	Attention      []string   `json:"attention"`
 }
 
-// ErrorCountsAnswer is warn and error lines per project, per bucket and in all.
-// Buckets start on UTC hours or days; the first and last may be partial, and
-// buckets with no lines are left out.
+// ErrorCountsAnswer is warn and error lines per project, per UTC hour or day (empty ones left out) and in all.
 type ErrorCountsAnswer struct {
 	From    time.Time     `json:"from"`
 	To      time.Time     `json:"to"`
@@ -119,9 +117,7 @@ type ErrorGroupsAnswer struct {
 	TotalGroups int64        `json:"total_groups"` // before the limit
 }
 
-// ErrorGroup is the lines of one project and service, at one level, that
-// share a fingerprint: the message, plus its err field, with ids and numbers
-// replaced by <id> and <n>. Fingerprint and NewestMessage are untrusted text.
+// ErrorGroup is the lines of one service and level that share a fingerprint; its texts are untrusted.
 type ErrorGroup struct {
 	Fingerprint   string    `json:"fingerprint"`
 	Project       *string   `json:"project"`

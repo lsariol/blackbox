@@ -135,8 +135,7 @@ func cleanString(s string) string {
 	return strings.ReplaceAll(strings.ToValidUTF8(s, "�"), "\x00", "")
 }
 
-// parseJSON reads a JSON object with a level and a message; anything else is
-// plain text.
+// parseJSON reads a JSON object with a level and a message; anything else is plain text.
 func parseJSON(line string) (Record, map[string]any) {
 	plain := Record{Level: LevelUnknown, Message: line}
 	dec := json.NewDecoder(strings.NewReader(line))
@@ -202,8 +201,7 @@ func cleanValue(v any) any {
 	return v
 }
 
-// parseSlogText reads slog's text format: key=value pairs, with values quoted
-// when they need it.
+// parseSlogText reads slog's text format: key=value pairs, quoted where needed.
 func parseSlogText(line string) (Record, map[string]any) {
 	plain := Record{Level: LevelUnknown, Message: line}
 	pairs, ok := splitPairs(line)
@@ -260,8 +258,7 @@ func splitPairs(line string) (map[string]string, bool) {
 	return pairs, true
 }
 
-// parseGoLog reads a line from Go's log package: its timestamp is dropped,
-// since Docker's is kept. The CLI symbols are the only level it has.
+// parseGoLog reads Go's log package, dropping its timestamp for Docker's; CLI symbols give the level.
 func parseGoLog(line string) (Record, map[string]any) {
 	rest := goLogPrefix.ReplaceAllString(line, "")
 	level := LevelUnknown

@@ -1,6 +1,4 @@
-// Package containers is what blackbox-proxy answers and the collector reads:
-// the container list, as Blackbox's own types, and the log streams. Only these
-// fields ever leave the proxy, apart from the log bytes themselves.
+// Package containers is all that leaves blackbox-proxy, besides log bytes: the container list and streams.
 package containers
 
 import "time"
@@ -45,8 +43,7 @@ func (c Container) Active() bool {
 	return false
 }
 
-// ContainersAnswer is the answer to GET /v1/containers: every container, and
-// the ones Docker couldn't inspect, which are left out of the list.
+// ContainersAnswer is GET /v1/containers: every container, and apart those Docker couldn't inspect.
 type ContainersAnswer struct {
 	Containers []Container      `json:"containers"`
 	Failed     []ContainerError `json:"failed"`
@@ -59,8 +56,7 @@ type ContainerError struct {
 	Reason string `json:"reason"`
 }
 
-// LatestAnswer is the answer to GET /v1/logs/{id}/latest: the newest line's
-// time, nil when the container has written nothing. Never the line's text.
+// LatestAnswer is GET /v1/logs/{id}/latest: the newest line's time, or nil; never its text.
 type LatestAnswer struct {
 	Latest *time.Time `json:"latest"`
 }

@@ -1,5 +1,4 @@
-// Command blackbox is Spark's private log store. One binary runs as each part
-// of Blackbox or as its CLI, picked by the first argument.
+// Command blackbox is Spark's log store: one binary for each part of Blackbox and its CLI.
 package main
 
 import (
@@ -226,8 +225,7 @@ func runCommand(args []string) int {
 	return 0
 }
 
-// cliOptions point the CLI at the API in its own container, with the token
-// blackbox-api has. Elsewhere the commands that need it say where to run instead.
+// cliOptions point the CLI at the API in its own container, with blackbox-api's token.
 func cliOptions(cfg config.Config) cli.Options {
 	return cli.Options{
 		Env:     cfg.Env,

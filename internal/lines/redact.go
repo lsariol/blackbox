@@ -13,9 +13,7 @@ var sensitiveWords = []string{
 	"password", "passwd", "secret", "token", "api_key", "apikey", "authorization", "cookie",
 }
 
-// patterns find secrets in text. They're a safety net and can miss things:
-// the real protection is not logging secrets. Each keeps its first group and
-// replaces the rest.
+// patterns are a safety net for secrets in text, keeping each match's first group.
 var patterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)(\bbearer\s+)[a-z0-9._~+/=-]+`),
 	regexp.MustCompile(`(?i)(\b[a-z][a-z0-9+.-]*://[^\s:/@]*:)[^\s/@]+(?:@)`),

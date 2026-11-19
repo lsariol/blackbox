@@ -1,21 +1,12 @@
 #!/bin/sh
-# A throwaway Postgres for the database integration tests, set up with the
-# same scripts/db/setup.sql as sparkdb, so the roles and grants match prod.
-#
-#   scripts/test-db.sh up     start it (container blackbox-testdb, 127.0.0.1:55434)
-#   scripts/test-db.sh down   remove it, with all its data
-#
-# Then, in the same shell (Git Bash on Windows):
-#   eval "$(scripts/test-db.sh env)"
-#   go test ./...
-#
-# The passwords below exist only in this container, which is never reachable
-# from anywhere but this machine.
+# A throwaway Postgres on 127.0.0.1:55434 for the database tests, with prod's roles: up, env or down.
 set -eu
 
 NAME=blackbox-testdb
 PORT=55434
 IMAGE=postgres:16.4
+
+# These passwords exist only in this container, reachable only from this machine.
 
 case "${1:-}" in
 up)

@@ -1,5 +1,4 @@
-// Package config reads Blackbox's settings from the environment. Secrets arrive
-// under their Cove key names; everything else is fixed in code.
+// Package config reads Blackbox's settings: secrets come in variables named after their Cove keys.
 package config
 
 import (
@@ -32,8 +31,7 @@ func Load(getenv func(string) string) (Config, error) {
 	return Config{Env: env, Version: version}, nil
 }
 
-// Secret returns the environment variable name, which carries the Cove key of
-// the same name; it's an error when it's missing.
+// Secret returns the environment variable name, or an error when it's missing.
 func Secret(getenv func(string) string, name string) (string, error) {
 	v := strings.TrimSpace(getenv(name))
 	if v == "" {
@@ -42,8 +40,7 @@ func Secret(getenv func(string) string, name string) (string, error) {
 	return v, nil
 }
 
-// buildVersion is "dev-<commit>" when the binary was built from a git
-// checkout, otherwise "dev".
+// buildVersion is "dev-<commit>" for a build from a git checkout, otherwise "dev".
 func buildVersion() string {
 	if info, ok := debug.ReadBuildInfo(); ok {
 		for _, s := range info.Settings {

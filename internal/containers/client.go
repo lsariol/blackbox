@@ -51,16 +51,14 @@ func NewClient(socket string) *Client {
 	}
 }
 
-// Containers returns every container, stopped ones included, and the ones
-// Docker couldn't inspect.
+// Containers returns every container, stopped ones included, and those Docker couldn't inspect.
 func (c *Client) Containers(ctx context.Context) (ContainersAnswer, error) {
 	var answer ContainersAnswer
 	err := c.get(ctx, "/v1/containers", &answer)
 	return answer, err
 }
 
-// Latest returns the time of the container's newest line; ok is false when it
-// has written nothing.
+// Latest returns the time of the container's newest line; ok is false when it has none.
 func (c *Client) Latest(ctx context.Context, id string) (latest time.Time, ok bool, err error) {
 	var answer LatestAnswer
 	if err := c.get(ctx, "/v1/logs/"+url.PathEscape(id)+"/latest", &answer); err != nil {
@@ -77,8 +75,7 @@ func (c *Client) Healthy(ctx context.Context) error {
 	return c.get(ctx, "/healthz", nil)
 }
 
-// Stream opens a container's log stream: Docker's bytes, unchanged, until the
-// container stops or ctx is cancelled.
+// Stream opens a container's log: Docker's bytes, unchanged, until it stops or ctx is cancelled.
 func (c *Client) Stream(ctx context.Context, id string, start Start) (io.ReadCloser, error) {
 	query := "since=" + strconv.FormatInt(start.SinceNanos, 10)
 	if start.FromEnd {

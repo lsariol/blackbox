@@ -40,9 +40,7 @@ func colorize(color string, s string) string {
 	return color + s + reset
 }
 
-// clean replaces control characters, except line breaks, with "?". Much of
-// what the CLI prints comes from outside (container names, labels, websites'
-// errors), and a control character could take over the terminal.
+// clean replaces control characters but line breaks with "?": outside text could take over the terminal.
 func clean(s string) string {
 	return strings.Map(func(r rune) rune {
 		if r != '\n' && unicode.IsControl(r) {
@@ -52,8 +50,7 @@ func clean(s string) string {
 	}, s)
 }
 
-// cell is clean for one table cell or field: on a single line, with tabs as
-// spaces, since a tab would start a new column.
+// cell is clean on one line, with tabs as spaces, since a tab would start a new column.
 func cell(s string) string {
 	return clean(strings.NewReplacer("\n", " ", "\t", " ").Replace(s))
 }
@@ -78,8 +75,7 @@ func info(msg string) {
 	fmt.Fprintln(stderr, clean(msg))
 }
 
-// promptFor returns the prompt for an environment: "blackbox (dev)> ", or
-// "blackbox (prod)> " with the label in red.
+// promptFor returns "blackbox (dev)> ", or "blackbox (prod)> " with the label in red.
 func promptFor(env string) string {
 	env = strings.ToLower(strings.TrimSpace(env))
 	if env == "" {

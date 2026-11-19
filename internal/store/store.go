@@ -1,5 +1,4 @@
-// Package store is Blackbox's log store in Postgres (blackbox_db on sparkdb):
-// the embedded migrations, the collector's writes, and the API's reads.
+// Package store is Blackbox's Postgres store: migrations, the collector's writes and the API's reads.
 package store
 
 import (
@@ -25,8 +24,7 @@ type Store struct {
 	pool *pgxpool.Pool
 }
 
-// Connect opens a pool for connString and checks that the database answers.
-// key is the Cove key the string came from, for error messages.
+// Connect opens a pool and checks the database answers; key names the setting in errors.
 func Connect(ctx context.Context, connString, key string) (*Store, error) {
 	cfg, err := pgxpool.ParseConfig(connString)
 	if err != nil {
@@ -58,8 +56,7 @@ func (s *Store) Close() {
 	s.pool.Close()
 }
 
-// IsBadData reports whether Postgres refused a value (a data exception), as
-// opposed to failing: trying the same write again would fail the same way.
+// IsBadData reports a refused value, which would fail the same way if the write were retried.
 func IsBadData(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && len(pgErr.Code) == 5 && pgErr.Code[:2] == "22"

@@ -29,8 +29,7 @@ var errNotFound = errors.New("not found")
 // idPattern is a full container ID, checked before one goes into a path.
 var idPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
-// docker is a minimal Docker Engine API client over its socket: the read calls
-// the proxy makes, and nothing else.
+// docker is a minimal Docker Engine API client: the proxy's read calls and nothing else.
 type docker struct {
 	base string
 	http *http.Client
@@ -65,8 +64,7 @@ func (l listed) name() string {
 	return strings.TrimPrefix(l.Names[0], "/")
 }
 
-// inspected holds the inspect fields Blackbox uses. Fields not declared here,
-// such as Config.Env, Config.Cmd and Mounts, are never read into memory.
+// inspected holds only the inspect fields Blackbox uses, so Config.Env and the like are never read in.
 type inspected struct {
 	ID      string `json:"Id"`
 	Name    string `json:"Name"`
@@ -118,8 +116,7 @@ func (d *docker) inspect(ctx context.Context, id string) (inspected, error) {
 	return c, err
 }
 
-// logs opens a container's log output. query holds fixed values and numbers
-// the handler checked; nothing a caller sent is copied in.
+// logs opens a container's log; query holds only values the handler built, nothing a caller sent.
 func (d *docker) logs(ctx context.Context, id, query string) (io.ReadCloser, error) {
 	path := "/containers/" + id + "/logs?stdout=1&stderr=1&timestamps=1&" + query
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, d.base+path, nil)
@@ -211,8 +208,7 @@ func excluded(c inspected) bool {
 	return strings.EqualFold(c.Config.Labels[containers.LogsLabel], containers.LogsOff)
 }
 
-// parseTime reads one of Docker's timestamps; Docker's zero time and
-// anything unreadable become the zero time.
+// parseTime reads a Docker timestamp; its zero time and anything unreadable become the zero time.
 func parseTime(s string) time.Time {
 	t, err := time.Parse(time.RFC3339Nano, s)
 	if err != nil || t.Year() <= 1 {

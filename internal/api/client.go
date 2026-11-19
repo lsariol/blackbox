@@ -73,8 +73,7 @@ func (c *Client) Status(ctx context.Context) (StatusAnswer, error) {
 	return answer, err
 }
 
-// ErrorGroups lists repeated lines; query holds the parameters of
-// GET /v1/stats/errors/groups.
+// ErrorGroups lists repeated lines; query holds GET /v1/stats/errors/groups's parameters.
 func (c *Client) ErrorGroups(ctx context.Context, query url.Values) (ErrorGroupsAnswer, error) {
 	var answer ErrorGroupsAnswer
 	err := c.get(ctx, "/v1/stats/errors/groups", query, &answer)

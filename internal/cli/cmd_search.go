@@ -16,8 +16,7 @@ import (
 
 const searchForm = "search [text] [--since 1h] [--project NAME] [--service NAME] [--container NAME] [--version V] [--level LEVEL] [--stream NAME] [--field KEY=VALUE] [--oldest] [--limit N] [--cursor X] [--json]"
 
-// lineTime is how a log line's time is shown: unlike other times in the CLI it
-// has seconds, because lines from the same minute need telling apart.
+// lineTime has seconds, unlike other CLI times, to tell lines from the same minute apart.
 const lineTime = "2006-01-02 15:04:05"
 
 // parsed is a search's arguments.

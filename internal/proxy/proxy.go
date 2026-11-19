@@ -1,7 +1,4 @@
-// Package proxy is blackbox-proxy, the only part of Blackbox with the Docker
-// socket. It answers fixed requests on a Unix socket and builds every Docker
-// call itself. It never parses log text: that can be hostile, and this is the
-// one process with root-equivalent access, so log bytes pass through unread.
+// Package proxy is blackbox-proxy, the only part with the Docker socket; it never parses log bytes.
 package proxy
 
 import (
@@ -69,8 +66,7 @@ func (s *Server) Handler() http.Handler {
 	return mux
 }
 
-// Serve answers on a Unix socket at path until ctx is cancelled. A socket
-// left by an earlier run is replaced.
+// Serve answers on a Unix socket at path, replacing an old one, until ctx is cancelled.
 func (s *Server) Serve(ctx context.Context, path string) error {
 	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("proxy: removing the old socket %s: %w", path, err)
@@ -80,16 +76,13 @@ func (s *Server) Serve(ctx context.Context, path string) error {
 		return fmt.Errorf("proxy: listening on %s: %w: is the proxy volume mounted at its folder?", path, err)
 	}
 	defer os.Remove(path)
-	// Only the proxy and the collector mount the folder, so anyone who can see
-	// the socket may use it; the collector runs as another user.
+	// Only the proxy and the collector, another user, mount the folder, so anyone seeing it may connect.
 	if err := os.Chmod(path, 0o666); err != nil {
 		ln.Close()
 		return fmt.Errorf("proxy: making %s usable by the collector: %w", path, err)
 	}
 
-	// No read or write timeout: a log stream lasts as long as its container,
-	// and a read timeout would cancel its context. Requests have no body, and
-	// each Docker call has its own limit.
+	// No read or write timeout: a stream lasts as long as its container, and Docker calls have their own.
 	srv := &http.Server{
 		Handler:           s.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
@@ -153,8 +146,7 @@ func (s *Server) containers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, answer)
 }
 
-// logs streams one container's output, unchanged, until it ends or the caller
-// hangs up.
+// logs streams one container's output, unchanged, until it ends or the caller hangs up.
 func (s *Server) logs(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	query, reason := dockerQuery(r.URL.Query())
@@ -207,8 +199,7 @@ func (s *Server) logs(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// dockerQuery checks a log request's parameters and builds the Docker query
-// from them; reason says what's wrong.
+// dockerQuery builds the Docker query from a log request's checked parameters; reason says what's wrong.
 func dockerQuery(params url.Values) (query, reason string) {
 	const want = "give since=<unix nanoseconds> or from=end, and nothing else"
 	if len(params) != 1 {
@@ -230,8 +221,7 @@ func dockerQuery(params url.Values) (query, reason string) {
 	return "", want
 }
 
-// allowed checks that the container exists and hasn't opted out, answering
-// the request when it hasn't.
+// allowed checks the container exists and hasn't opted out, answering the request when not.
 func (s *Server) allowed(w http.ResponseWriter, r *http.Request, id string) bool {
 	c, err := s.docker.inspect(r.Context(), id)
 	if err != nil {
@@ -245,8 +235,7 @@ func (s *Server) allowed(w http.ResponseWriter, r *http.Request, id string) bool
 	return true
 }
 
-// latest answers with the time of the container's newest line, and never its
-// text. Reading from the end works past a damaged part of a log.
+// latest answers the newest line's time, never its text, reading from the end past any damage.
 func (s *Server) latest(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if !idPattern.MatchString(id) || len(r.URL.Query()) != 0 {
@@ -281,8 +270,7 @@ func (s *Server) latest(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, containers.LatestAnswer{Latest: stamp(head[:n], c.Config.Tty)})
 }
 
-// stamp reads the timestamp Docker put in front of a line: the first word
-// after the frame header, if there is one. It looks at nothing else.
+// stamp reads Docker's timestamp, the first word after any frame header, and nothing else.
 func stamp(head []byte, tty bool) *time.Time {
 	if !tty {
 		if len(head) < frameHeader {

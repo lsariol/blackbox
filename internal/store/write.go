@@ -120,8 +120,7 @@ func (s *Store) Register(ctx context.Context, c containers.Container, checkpoint
 	return t, nil
 }
 
-// Save stores a batch in one transaction, so a crash can't keep the records
-// without the checkpoints or the other way round.
+// Save stores a batch and its checkpoints in one transaction, so a crash can't split them.
 func (s *Store) Save(ctx context.Context, b Batch, now time.Time) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -176,8 +175,7 @@ func (s *Store) SetRemoved(ctx context.Context, id int32, at time.Time) error {
 	return nil
 }
 
-// SetDamaged records that a container's log can't be read from a checkpoint,
-// moves its checkpoint to now and notes the gap, all at once.
+// SetDamaged moves a damaged log's checkpoint to now and records the gap, in one go.
 func (s *Store) SetDamaged(ctx context.Context, id int32, gap Gap) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -227,8 +225,7 @@ func insertGap(ctx context.Context, tx pgx.Tx, g Gap) error {
 	return nil
 }
 
-// LastHeartbeat returns when the collector last reported; ok is false before
-// its first run.
+// LastHeartbeat returns when the collector last reported; ok is false before its first run.
 func (s *Store) LastHeartbeat(ctx context.Context) (at time.Time, ok bool, err error) {
 	err = s.pool.QueryRow(ctx, `SELECT heartbeat_at FROM blackbox.collector_status`).Scan(&at)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -263,10 +260,7 @@ func (s *Store) Report(ctx context.Context, st CollectorStatus, streams []Stream
 	return nil
 }
 
-// Retain deletes what's past retention, then the oldest records while they
-// take more than MaxBytes, and saves how much is stored. The size is added up
-// from the rows: a delete doesn't shrink the table's files, so measuring those
-// would keep deleting until nothing was left.
+// Retain deletes what's past retention, then the oldest while over MaxBytes, sized from rows, not files.
 func (s *Store) Retain(ctx context.Context, now time.Time) (deleted, stored int64, err error) {
 	cutoff := now.Add(-Retention)
 	for {

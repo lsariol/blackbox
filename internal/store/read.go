@@ -194,8 +194,7 @@ func (s *Store) Record(ctx context.Context, id int64) (Row, error) {
 	return row, nil
 }
 
-// Context returns the lines around a record in the same container, in order,
-// with the record itself included.
+// Context returns the record and the lines around it in its container, in order.
 func (s *Store) Context(ctx context.Context, id int64, before, after int) ([]Row, error) {
 	rows, err := s.pool.Query(ctx, `
 		WITH target AS (SELECT container_id, ts, id FROM blackbox.records WHERE id = $1),

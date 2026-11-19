@@ -1,6 +1,4 @@
-// Package lines turns Docker's log bytes into records. Everything here reads
-// text that outsiders can influence, so nothing in it may panic, and a line it
-// can't make sense of is stored as plain text rather than dropped.
+// Package lines turns Docker's log bytes into records; it must never panic, and keeps odd lines as text.
 package lines
 
 import (
@@ -42,8 +40,7 @@ type Reader struct {
 	buf []byte
 }
 
-// NewReader reads a stream from Docker, requested with timestamps. A container
-// with a TTY has one combined output with no framing.
+// NewReader reads a timestamped Docker stream; with a TTY it's one output with no framing.
 func NewReader(r io.Reader, tty bool) *Reader {
 	return &Reader{r: bufio.NewReaderSize(r, 64<<10), tty: tty}
 }

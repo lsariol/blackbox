@@ -15,9 +15,7 @@ import (
 	"github.com/lsariol/blackbox/internal/containers"
 )
 
-// The integration tests run against a real, disposable Postgres set up with
-// scripts/db/setup.sql (scripts/test-db.sh does it). Without these variables
-// they're skipped.
+// The database tests need a disposable Postgres (scripts/test-db.sh); without these variables they skip.
 var (
 	migratorURL = os.Getenv("BLACKBOX_TEST_DATABASE_MIGRATOR_URL")
 	appURL      = os.Getenv("BLACKBOX_TEST_DATABASE_URL")

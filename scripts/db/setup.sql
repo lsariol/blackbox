@@ -1,22 +1,4 @@
--- Blackbox database: the one-time Admin setup on sparkdb.
---
--- Creates what's missing and fixes ownership and access:
---   roles     blackbox_owner (NOLOGIN), blackbox_migrator (member of the owner,
---             acting as it), blackbox_app, blackbox_reader
---   database  blackbox_db, owned by blackbox_owner; only the three login roles may
---             connect
---   schema    blackbox, if it exists already: owned by blackbox_owner
--- Everything inside the schema (tables, grants) comes from Blackbox's goose
--- migrations, never from here.
---
--- Safe to run again. It never changes the password of a role that exists; a
--- password is only needed for a role that doesn't exist yet, and every missing
--- one is checked before anything changes.
---
--- Run as the Admin superuser (on Spark, over SSH):
---   docker exec -i sparkdb psql -U Admin -d postgres \
---     -v migrator_password="..." -v app_password="..." -v reader_password="..." \
---     -f - < scripts/db/setup.sql
+-- Blackbox's roles, database and access, run by a superuser; safe to run again (see the README).
 
 \set ON_ERROR_STOP on
 SET client_min_messages = warning;
@@ -33,7 +15,7 @@ SELECT NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'blackbox_owner')    A
 
 \if :is_superuser
 \else
-DO $$ BEGIN RAISE EXCEPTION 'Run this as the Admin superuser (psql -U Admin).'; END $$;
+DO $$ BEGIN RAISE EXCEPTION 'Run this as a superuser.'; END $$;
 \endif
 
 \if :need_migrator
@@ -88,8 +70,7 @@ CREATE ROLE blackbox_reader LOGIN PASSWORD :'reader_password';
 ALTER ROLE blackbox_reader LOGIN;
 \endif
 
--- The migrator acts as the owner, so everything the migrations create is
--- owned by blackbox_owner, not by whoever ran them.
+-- The migrator acts as the owner, so what the migrations create belongs to blackbox_owner.
 GRANT blackbox_owner TO blackbox_migrator;
 ALTER ROLE blackbox_migrator SET role = 'blackbox_owner';
 
@@ -105,8 +86,7 @@ ALTER DATABASE blackbox_db OWNER TO blackbox_owner;
 REVOKE ALL ON DATABASE blackbox_db FROM PUBLIC;
 GRANT CONNECT ON DATABASE blackbox_db TO blackbox_migrator, blackbox_app, blackbox_reader;
 
--- 4. Inside the database: the blackbox schema (if an earlier setup made it)
--- belongs to the owner, and nobody else may create objects in public.
+-- 4. Inside the database: the schema belongs to the owner, and nobody may create in public.
 
 \connect blackbox_db
 DO $$

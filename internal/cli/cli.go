@@ -1,6 +1,4 @@
-// Package cli is Blackbox's command line: the shell and one-shot commands. It
-// is a thin client of the API, so it and Vista always agree. Every command is
-// read-only.
+// Package cli is Blackbox's read-only command line, a thin client of the API so it and Vista agree.
 package cli
 
 import (
@@ -76,8 +74,7 @@ func New(opts Options) *CLI {
 	return c
 }
 
-// Run reads and runs commands until stdin closes, `exit` is typed, or ctx is
-// cancelled.
+// Run reads and runs commands until stdin closes, `exit` is typed, or ctx is cancelled.
 func (c *CLI) Run(ctx context.Context) {
 	if c.interactive && c.runTerminal(ctx) {
 		return
@@ -112,8 +109,7 @@ func (c *CLI) Exec(ctx context.Context, args []string) error {
 	return cmd.run(c, ctx, args)
 }
 
-// Report shows an error returned by Exec: wrong arguments as a warning,
-// anything else as an error.
+// Report shows an error from Exec: wrong arguments as a warning, anything else as an error.
 func Report(err error) {
 	report(err)
 }

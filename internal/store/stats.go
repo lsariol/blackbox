@@ -25,8 +25,7 @@ type ErrorCount struct {
 	Warns   int64
 }
 
-// ErrorCounts counts warn and error lines per project per bucket, over lines
-// with ts in [from, to]. Buckets without lines are left out.
+// ErrorCounts counts warn and error lines per project per bucket in [from, to], leaving out empty buckets.
 func (s *Store) ErrorCounts(ctx context.Context, from, to time.Time, bucket Bucket, projects []string) ([]ErrorCount, error) {
 	w := &where{}
 	w.add("r.level >= ?", int16(30))
@@ -59,19 +58,14 @@ func (s *Store) ErrorCounts(ctx context.Context, from, to time.Time, bucket Buck
 	return list, nil
 }
 
-// fingerprintSQL is a line's fingerprint: its message, plus its err field when
-// it has one, with ids and numbers taken out, so repeats of one problem match.
-// In order: UUIDs; words of 7 or more letters and digits mixed (hashes,
-// container and request ids), but not a number with a unit such as 1500ms;
-// then every number, decimals and dotted versions included.
+// fingerprintSQL is the message and err field with UUIDs, mixed ids (not 1500ms) and numbers taken out.
 const fingerprintSQL = `regexp_replace(regexp_replace(regexp_replace(
 	left(r.message || COALESCE(' err=' || (r.attrs ->> 'err'), ''), 500),
 	'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', '<id>', 'gi'),
 	'\m(?![0-9]+[a-z]*\M)(?=\w*[0-9])(?=\w*[a-z])\w{7,}\M', '<id>', 'gi'),
 	'[0-9]+(\.[0-9]+)*', '<n>', 'g')`
 
-// ErrorGroup is the lines of one project and service, at one level, that share
-// a fingerprint.
+// ErrorGroup is the lines of one service and level that share a fingerprint.
 type ErrorGroup struct {
 	Fingerprint   string
 	Project       string
@@ -92,9 +86,7 @@ type GroupsQuery struct {
 	Limit    int
 }
 
-// ErrorGroups groups the lines at MinLevel and above by project, service,
-// level and fingerprint, most lines first. Total is how many groups there are
-// before Limit.
+// ErrorGroups groups lines at MinLevel and up by source, level and fingerprint; total is before Limit.
 func (s *Store) ErrorGroups(ctx context.Context, q GroupsQuery) (groups []ErrorGroup, total int64, err error) {
 	w := &where{}
 	w.add("r.level >= ?", q.MinLevel)

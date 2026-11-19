@@ -1,7 +1,4 @@
-// Package api is blackbox-api: it serves log searches and collection status to
-// authenticated consumers on the spark network. Answers are built field by
-// field, and log text is returned as stored: anything showing it must treat it
-// as untrusted.
+// Package api is blackbox-api: authenticated log searches and status; log text in answers is untrusted.
 package api
 
 import (
@@ -39,8 +36,7 @@ const (
 	maxText        = 256
 	defaultRange   = time.Hour
 
-	// The error statistics: the last day unless asked, at most a little over
-	// what's kept.
+	// The error statistics: the last day unless asked, at most a little over what's kept.
 	defaultStatsRange = 24 * time.Hour
 	maxStatsRange     = 31 * 24 * time.Hour
 	defaultGroups     = 50
@@ -125,8 +121,7 @@ func (s *Server) Handler() http.Handler {
 	return http.TimeoutHandler(securityHeaders(mux), requestTimeout, `{"error":"the request took too long"}`)
 }
 
-// Serve listens on addr until ctx is cancelled, connecting to the database in
-// the background.
+// Serve listens on addr until ctx is cancelled, connecting to the database in the background.
 func (s *Server) Serve(ctx context.Context, addr string) error {
 	go s.connect(ctx)
 
@@ -157,8 +152,7 @@ func (s *Server) Serve(ctx context.Context, addr string) error {
 	return nil
 }
 
-// connect opens the database, retrying until it answers with the schema this
-// build needs (the collector applies migrations).
+// connect retries until the database answers with this build's schema (the collector migrates it).
 func (s *Server) connect(ctx context.Context) {
 	for {
 		db, err := s.opts.OpenReader(ctx)
@@ -236,8 +230,7 @@ func (s *Server) require(sc scope, next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// refusals logs refused requests: the first at once, then at most one summary
-// a minute, so a flood of bad requests can't flood the log (and the disk).
+// refusals logs the first refused request, then one summary a minute at most, so a flood can't fill the disk.
 type refusals struct {
 	mu      sync.Mutex
 	logged  time.Time
@@ -264,8 +257,7 @@ func bearer(header string) (string, bool) {
 	return token, true
 }
 
-// withDB runs fn with the database and a query deadline, answering 503 when
-// the database can't.
+// withDB runs fn with the database and a query deadline, answering 503 when it can't.
 func (s *Server) withDB(w http.ResponseWriter, r *http.Request, fn func(ctx context.Context, db Reader) (any, error)) {
 	db, err := s.reader()
 	if err != nil {

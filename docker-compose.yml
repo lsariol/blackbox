@@ -3,9 +3,7 @@ name: blackbox
 x-lighthouse:
   deploy: releases
 
-# Secrets are only passed through: each line names a Cove key, Lighthouse
-# fills it in at deploy, and the container sees it under the same name.
-# Every other setting is in the code.
+# Secrets are passed through under their Cove key names; every other setting is in the code.
 
 services:
   blackbox-proxy:

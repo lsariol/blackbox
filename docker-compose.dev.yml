@@ -1,6 +1,4 @@
-# Local development on Docker Desktop. Lighthouse never reads this file.
-#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
-# The ${...} values come from .env (copy .env.example).
+# Local development, with values from .env: docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 
 services:
   blackbox-proxy:

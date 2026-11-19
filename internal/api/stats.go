@@ -43,8 +43,7 @@ func (s *Server) errorCounts(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// buildErrorCounts shapes the counts and adds each project's totals, in
-// project order.
+// buildErrorCounts shapes the counts and adds each project's totals, in project order.
 func buildErrorCounts(counts []store.ErrorCount, from, to time.Time, bucket store.Bucket) ErrorCountsAnswer {
 	answer := ErrorCountsAnswer{From: from.UTC(), To: to.UTC(), Bucket: string(bucket),
 		Buckets: make([]ErrorBucket, len(counts)), Totals: []ErrorTotal{}}

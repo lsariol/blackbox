@@ -5,8 +5,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o blackbox ./cmd/blackbox
 
-# Lighthouse builds this stage before every deploy: a failure stops the
-# deploy. Database tests skip here (no Postgres); scripts/test-db.sh runs them.
+# Built before every deploy: a failure stops it. Database tests skip here, with no Postgres.
 FROM builder AS test
 RUN apk add --no-cache gcc musl-dev
 RUN unformatted="$(gofmt -l .)" && [ -z "$unformatted" ] || { echo "These files need gofmt:"; echo "$unformatted"; exit 1; }

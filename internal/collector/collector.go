@@ -1,10 +1,4 @@
-// Package collector is blackbox-collector: it follows every container's log
-// through the proxy and saves the lines. One loop owns all the state; each
-// stream only reads and parses, then hands its lines to the loop.
-//
-// There is no retry queue. Docker's log files are the buffer: a line counts as
-// read once its transaction commits, and after any failure the streams reopen
-// from the saved checkpoints.
+// Package collector is blackbox-collector; with no retry queue, it rereads from checkpoints after a failure.
 package collector
 
 import (
@@ -221,8 +215,7 @@ func (c *Collector) Run(ctx context.Context) error {
 	}
 }
 
-// connect opens the database, migrating it, and picks up where the last run
-// left off. It keeps trying until it works; false means ctx ended first.
+// connect migrates and opens the database, retrying until it works; false means ctx ended first.
 func (c *Collector) connect(ctx context.Context) bool {
 	for {
 		err := c.open(ctx)
@@ -297,8 +290,7 @@ drain:
 	c.report(ctx)
 }
 
-// handle takes one event from a stream. Anything from a closed stream is
-// dropped: its lines will be read again from the checkpoint.
+// handle takes a stream's event, dropping a closed stream's: they're reread from the checkpoint.
 func (c *Collector) handle(ctx context.Context, ev event) {
 	if ev.c.stream != ev.stream {
 		return
@@ -343,8 +335,7 @@ func (c *Collector) handle(ctx context.Context, ev event) {
 	}
 }
 
-// skipped records lines a stream jumped over. Docker does this at a damaged
-// part of a log: with no error, it carries on with new lines.
+// skipped records lines Docker jumped over, without an error, at a damaged part of a log.
 func (c *Collector) skipped(ctx context.Context, ev event) {
 	c.opts.Log.Warn("a log stream skipped lines, probably at a damaged part of the log", "container", ev.c.info.Name)
 	now := c.opts.Now()
@@ -389,8 +380,7 @@ func (c *Collector) add(ev event) {
 	c.pendingBytes += len(ev.rec.Message) + len(ev.rec.Attrs)
 }
 
-// flush saves the batch. If it can't, every stream closes and reopens from its
-// checkpoint once the database is back, so nothing is held here.
+// flush saves the batch; if it can't, every stream reopens from its checkpoint once the database is back.
 func (c *Collector) flush(ctx context.Context) {
 	if len(c.pending.Records) == 0 {
 		c.lag = 0
@@ -526,8 +516,7 @@ func (c *Collector) visit(ctx context.Context, info containers.Container) bool {
 	return true
 }
 
-// register adds a new container, reading from its creation or the retention
-// limit, whichever is later: older lines would only be deleted again.
+// register adds a container, read from its creation or the retention limit, whichever is later.
 func (c *Collector) register(ctx context.Context, info containers.Container, now time.Time) (store.Tracked, error) {
 	from := now.Add(-store.Retention)
 	if info.CreatedAt.After(from) {
@@ -544,8 +533,7 @@ func sameMoment(a, b *time.Time) bool {
 	return a.Truncate(time.Microsecond).Equal(b.Truncate(time.Microsecond))
 }
 
-// follow opens a container's stream, from its checkpoint unless its log is
-// damaged: then only new lines can be read, and what's skipped is a gap.
+// follow opens a stream at its checkpoint, or at new lines when the log is damaged, recording a gap.
 func (c *Collector) follow(ctx context.Context, t *container) bool {
 	now := c.opts.Now()
 	start := containers.Start{SinceNanos: t.Checkpoint}
@@ -591,8 +579,7 @@ func (c *Collector) read(ctx context.Context, t *container, s *stream, id string
 		}
 	}
 
-	// The newest line now must arrive before any later one. If a later one
-	// comes first, Docker jumped over the backlog.
+	// If a line newer than the current newest comes first, Docker jumped over the backlog.
 	var expected int64
 	if !start.FromEnd {
 		callCtx, cancel := context.WithTimeout(ctx, callTimeout)
@@ -645,8 +632,7 @@ func (c *Collector) read(ctx context.Context, t *container, s *stream, id string
 	}
 }
 
-// drain finishes a stopped container. A stream can stop short of the end at a
-// damaged part of the log, so its newest line is checked first.
+// drain finishes a stopped container, checking its newest line since a damaged log ends streams early.
 func (c *Collector) drain(ctx context.Context, t *container) bool {
 	now := c.opts.Now()
 	if latest, ok, err := c.opts.Docker.Latest(ctx, t.info.ID); err == nil && ok && latest.UnixNano() > t.Checkpoint {
@@ -668,8 +654,7 @@ func (c *Collector) drain(ctx context.Context, t *container) bool {
 	return true
 }
 
-// removed handles a container gone from Docker. Its stream gets one scan to
-// end by itself; a container that wasn't read to the end leaves a gap.
+// removed gives a vanished container's stream one scan to end, and records a gap if it doesn't.
 func (c *Collector) removed(ctx context.Context, t *container) bool {
 	if t.stream != nil && !t.missing {
 		t.missing = true
@@ -695,9 +680,7 @@ func (c *Collector) removed(ctx context.Context, t *container) bool {
 	return true
 }
 
-// checkStuck finds streams that went silent while their container kept
-// logging, which is what a damaged log looks like. A stream is only given up
-// on when it's still silent, with newer lines waiting, on the next check.
+// checkStuck gives up on a stream silent over two checks while newer lines wait: a damaged log.
 func (c *Collector) checkStuck(ctx context.Context) {
 	if c.paused() {
 		return
@@ -781,8 +764,7 @@ func (c *Collector) databaseFailed(err error) {
 	c.pause(c.opts.Now())
 }
 
-// problem logs a new problem once and keeps it in slot for `status`. Each
-// source has its own slot, so Docker answering doesn't clear a database error.
+// problem logs a new problem once and keeps it, per source, in slot for `status`.
 func (c *Collector) problem(slot *string, msg string, err error) {
 	text := err.Error()
 	if text != *slot {
@@ -802,8 +784,7 @@ func (t *container) setState(state, lastError string) {
 	t.state, t.lastError = state, lastError
 }
 
-// beat refreshes the heartbeat file. A failure shows up as an unhealthy
-// container, and the log says why.
+// beat refreshes the heartbeat file; a failure makes the container unhealthy and is logged.
 func (c *Collector) beat() {
 	stamp := []byte(c.opts.Now().UTC().Format(time.RFC3339))
 	if err := os.WriteFile(c.opts.Heartbeat, stamp, 0o644); err != nil {
@@ -811,8 +792,7 @@ func (c *Collector) beat() {
 	}
 }
 
-// Healthy returns nil while the heartbeat at path is fresh. It doesn't depend
-// on Docker or the database, so a sparkdb restart doesn't roll Blackbox back.
+// Healthy is nil while the heartbeat is fresh, ignoring Docker and the database so a sparkdb restart can't roll Blackbox back.
 func Healthy(path string, now time.Time) error {
 	data, err := os.ReadFile(path)
 	if err != nil {

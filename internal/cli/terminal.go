@@ -11,9 +11,7 @@ import (
 	"golang.org/x/term"
 )
 
-// runTerminal runs the prompt with line editing: arrow keys, history
-// (up/down) and Tab completion. It returns false if the terminal can't be
-// put in raw mode, so Run falls back to plain lines.
+// runTerminal runs the prompt with line editing, or returns false for Run to read plain lines.
 func (c *CLI) runTerminal(ctx context.Context) bool {
 	fd := int(os.Stdin.Fd())
 
@@ -43,8 +41,7 @@ func (c *CLI) runTerminal(ctx context.Context) bool {
 	return true
 }
 
-// complete handles Tab: command names first, then the command's own
-// completions.
+// complete handles Tab: command names first, then the command's own completions.
 func (c *CLI) complete(line string, pos int, key rune) (string, int, bool) {
 	if key != '\t' {
 		return "", 0, false
@@ -82,8 +79,7 @@ func (c *CLI) complete(line string, pos int, key rune) (string, int, bool) {
 	return head[:start] + completed + tail, start + len(completed), true
 }
 
-// candidates is what the word being typed could become: command names, then
-// the command's own completions, its flags, or the values of a name flag.
+// candidates is what the typed word could become: a command, its completions, flags or a flag's values.
 func (c *CLI) candidates(before []string, word string) ([]string, bool) {
 	if len(before) == 0 {
 		return c.commandNames(), true
@@ -108,8 +104,7 @@ func (c *CLI) candidates(before []string, word string) ([]string, bool) {
 	return nil, false
 }
 
-// sourceValues lists what a name flag can be, from what's stored. Tab must
-// never fail loudly, so a failed call offers nothing.
+// sourceValues lists a name flag's stored values; Tab never fails loudly, so an error offers nothing.
 func (c *CLI) sourceValues(flag string) []string {
 	client, err := c.client()
 	if err != nil {
