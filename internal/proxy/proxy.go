@@ -99,7 +99,10 @@ func (s *Server) Serve(ctx context.Context, path string) error {
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		srv.Shutdown(shutdown)
+		// The collector's log streams never end on their own, so this is expected.
+		if err := srv.Shutdown(shutdown); err != nil {
+			s.log.Info("open log streams closed at shutdown", "err", err)
+		}
 		srv.Close()
 	}()
 

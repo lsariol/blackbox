@@ -71,31 +71,31 @@ Run "blackbox help" to list the CLI commands.
 
 // runProxy runs blackbox-proxy until SIGINT or SIGTERM (docker stop).
 func runProxy() {
-	cfg := loadConfig()
 	log := newLogger("proxy")
-	log.Info("Blackbox starting", "version", cfg.Version, "env", cfg.Env)
+	serviceConfig(log)
+	log.Info("Blackbox starting")
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if err := proxy.New(proxy.DockerSocket, log).Serve(ctx, containers.Socket); err != nil {
-		fatal(err)
+		stopOn(log, err)
 	}
 	log.Info("Blackbox stopped")
 }
 
 // runCollector runs blackbox-collector until SIGINT or SIGTERM (docker stop).
 func runCollector() {
-	cfg := loadConfig()
 	log := newLogger("collector")
-	log.Info("Blackbox starting", "version", cfg.Version, "env", cfg.Env)
+	cfg := serviceConfig(log)
+	log.Info("Blackbox starting")
 
 	migratorURL, err := config.Secret(os.Getenv, "BLACKBOX_DATABASE_MIGRATOR_URL")
 	if err != nil {
-		fatal(err)
+		stopOn(log, err)
 	}
 	appURL, err := config.Secret(os.Getenv, "BLACKBOX_DATABASE_URL")
 	if err != nil {
-		fatal(err)
+		stopOn(log, err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -121,20 +121,20 @@ func runCollector() {
 		},
 	})
 	if err := c.Run(ctx); err != nil {
-		fatal(err)
+		stopOn(log, err)
 	}
 	log.Info("Blackbox stopped")
 }
 
 // runAPI runs blackbox-api until SIGINT or SIGTERM (docker stop).
 func runAPI() {
-	cfg := loadConfig()
 	log := newLogger("api")
-	log.Info("Blackbox starting", "version", cfg.Version, "env", cfg.Env)
+	cfg := serviceConfig(log)
+	log.Info("Blackbox starting")
 
 	readerURL, err := config.Secret(os.Getenv, "BLACKBOX_DATABASE_READER_URL")
 	if err != nil {
-		fatal(err)
+		stopOn(log, err)
 	}
 	s, err := api.New(api.Options{
 		Version: cfg.Version,
@@ -149,13 +149,13 @@ func runAPI() {
 		},
 	})
 	if err != nil {
-		fatal(err)
+		stopOn(log, err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if err := s.Serve(ctx, fmt.Sprintf(":%d", api.Port)); err != nil {
-		fatal(err)
+		stopOn(log, err)
 	}
 	log.Info("Blackbox stopped")
 }
@@ -251,7 +251,22 @@ func loadConfig() config.Config {
 	return cfg
 }
 
-// fatal prints an error and exits.
+// serviceConfig loads the settings for a service, stopping it if they're wrong.
+func serviceConfig(log *slog.Logger) config.Config {
+	cfg, err := config.Load(os.Getenv)
+	if err != nil {
+		stopOn(log, err)
+	}
+	return cfg
+}
+
+// stopOn logs why a service can't go on, so Blackbox stores it as an error, and exits.
+func stopOn(log *slog.Logger, err error) {
+	log.Error("Blackbox stopped on an error", "err", err)
+	os.Exit(1)
+}
+
+// fatal prints a CLI error and exits.
 func fatal(err error) {
 	fmt.Fprintf(os.Stderr, "blackbox: %v\n", err)
 	os.Exit(1)
