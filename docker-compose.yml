@@ -13,6 +13,7 @@ services:
     container_name: blackbox-proxy
     command: ["/blackbox", "proxy"]
     restart: unless-stopped
+    user: "0:0"                        # root, to read the Docker socket; the image's user is 10001
     network_mode: none                 # reached only through the socket in the proxy volume
     read_only: true
     cap_drop: [ALL]
