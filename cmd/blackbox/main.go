@@ -202,7 +202,7 @@ func runHealth(args []string) int {
 	return 0
 }
 
-// newLogger follows Spark's logging standard, tagged with the part logging.
+// newLogger is blackboxlog's logger, tagged with the part logging.
 func newLogger(part string) *slog.Logger {
 	return blackboxlog.New(blackboxlog.Options{}).With("component", part)
 }
